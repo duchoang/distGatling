@@ -26,3 +26,10 @@ gatling-rest/shared-journal/
 /gatling-ui/src/main/frontend/npm-debug.log
 /gatling-ui/src/main/frontend/assets/css/light-bootstrap-dashboard.css.map
 /gatling-rest/src/main/resources/static/*.map
+
+gatling-agent/files/
+gatling-agent/gatling-charts-highcharts-bundle-2.3.0/
+gatling-rest/files/
+gatling-rest/gatling-charts-highcharts-bundle-2.3.0/
+gatling-commons/journal/
+gatling-charts-highcharts-bundle-2.3.0-bundle.zip

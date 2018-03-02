@@ -235,4 +235,56 @@ public class ServerRepository {
         return summaries;
 
     }
+
+    /**
+     * Generates a unique tracking and submit the job to the master via the master proxy
+     * if the job is properly submitted return the tracking identifier
+     *
+     * @param simulationJobModel
+     * @return
+     * @throws Exception
+     */
+    public Optional<String> submitSimulationJobWithFatJar(SimulationJobModel simulationJobModel) throws Exception {
+        String trackingId = UUID.randomUUID().toString();
+        List<String> parameters = new ArrayList<String>(Arrays.asList(simulationJobModel.getParameterString().split(" +")));
+        parameters.add("-DsimulationClass=" + simulationJobModel.getFileFullName());
+        boolean hasDataFeed = !(simulationJobModel.getDataFile() == null || simulationJobModel.getDataFile().isEmpty());
+        JobSummary.JobInfo jobinfo = JobSummary.JobInfo.newBuilder()
+                .withCount(simulationJobModel.getCount())
+                .withJobName("gatling-fatjar")
+                .withPartitionAccessKey(simulationJobModel.getPartitionAccessKey())
+                .withPartitionName(simulationJobModel.getRoleId())
+                .withUser(simulationJobModel.getUser())
+                .withTrackingId(trackingId)
+                .withHasDataFeed(hasDataFeed)
+                .withParameterString(simulationJobModel.getParameterString())
+                .withFileFullName(simulationJobModel.getFileFullName())
+                .withDataFileName(getDataFileName(simulationJobModel,hasDataFeed))
+                .withJarFileName("gatling-uber-example-1.0.2-SNAPSHOT.jar")
+                .build();
+        Timeout timeout = new Timeout(6, TimeUnit.SECONDS);
+        int success = 0;
+        for (int i = 0; i < simulationJobModel.getCount(); i++) {
+            TaskEvent taskEvent = new TaskEvent();
+            taskEvent.setJobName("gatling-fatjar"); //the gatling.sh script is the gateway for simulation files
+            taskEvent.setJobInfo(jobinfo);
+            taskEvent.setParameters(new ArrayList<>(parameters));
+            Future<Object> future = ask(router, new Master.Job(simulationJobModel.getRoleId(), taskEvent, trackingId,
+                            agentConfig.getAbortUrl(),
+                            agentConfig.getJobFileUrl(simulationJobModel.getSimulation()),
+                            agentConfig.getJobFileUrl(simulationJobModel.getDataFile()), true),
+                    timeout);
+            Object result = Await.result(future, timeout.duration());
+            if (result instanceof MasterClientActor.Ok) {
+                success++;
+                log.debug("Ok message from server just got here, this indicates the job was successfully posted to the master: {}", result);
+            }
+        }
+
+        if (success == simulationJobModel.getCount()) {
+            log.debug("Job Successfully submitted to master");
+            return Optional.of(trackingId);
+        }
+        return Optional.empty();
+    }
 }
